@@ -83,4 +83,21 @@ export const trackingAPI = {
     }),
 };
 
+// Admin API (Owners — requires admin role)
+export const adminAPI = {
+  getDashboardStats: () => api.get('/admin/dashboard/stats'),
+
+  getAllOrders: () => api.get('/admin/orders'),
+
+  getActiveDeliveries: () => api.get('/admin/deliveries/active'),
+
+  getDrivers: () => api.get('/admin/drivers'),
+
+  createDelivery: (driver_id, order_ids) =>
+    api.post('/admin/deliveries', {
+      driver_id,
+      order_ids,
+    }),
+};
+
 export default api;

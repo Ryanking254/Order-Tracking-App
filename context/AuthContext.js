@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_URL = 'https://ots-backend.vercel.app/api'; // Must match services/api.js baseURL
+  const API_URL = 'https://order-tracking-backend-00rd.onrender.com/api'; // Must match services/api.js baseURL
 
   // Check if user is already logged in
   useEffect(() => {

@@ -20,6 +20,12 @@ import OrderStatusScreen from '../screens/driver/OrderStatusScreen';
 import DriverMapScreen from '../screens/driver/MapScreen';
 import DriverActiveDeliveryScreen from '../screens/driver/ActiveDeliveryScreen';
 
+//Admin (Owner) Screens
+import AdminDashboardScreen from '../screens/admin/DashboardScreen';
+import AdminOrdersScreen from '../screens/admin/OrdersScreen';
+import AdminDeliveriesScreen from '../screens/admin/DeliveriesScreen';
+import AssignDeliveryScreen from '../screens/admin/AssignDeliveryScreen';
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -135,6 +141,59 @@ function DriverStack() {
   );
 }
 
+function AdminTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: true,
+        tabBarActiveTintColor: '#4caf50',
+      }}
+    >
+      <Tab.Screen
+        name="Dashboard"
+        component={AdminDashboardScreen}
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="view-dashboard" size={24} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="AllOrders"
+        component={AdminOrdersScreen}
+        options={{
+          title: 'All Orders',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="package-multiple" size={24} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="ActiveDeliveries"
+        component={AdminDeliveriesScreen}
+        options={{
+          title: 'Deliveries',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="truck" size={24} color={color} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+function AdminStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="AdminTabs"
+        component={AdminTabs}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AssignDelivery"
+        component={AssignDeliveryScreen}
+        options={{ title: 'Assign Delivery' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 function RootNavigator() {
   const { isAuthenticated, user, loading } = useAuth();
 
@@ -152,7 +211,13 @@ function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {user?.role === 'driver' ? <DriverStack /> : <CustomerStack />}
+      {user?.role === 'admin' ? (
+        <AdminStack />
+      ) : user?.role === 'driver' ? (
+        <DriverStack />
+      ) : (
+        <CustomerStack />
+      )}
     </NavigationContainer>
   );
 }
