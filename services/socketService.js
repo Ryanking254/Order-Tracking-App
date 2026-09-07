@@ -2,7 +2,7 @@ import io from 'socket.io-client';
 
 let socket = null;
 
-const SOCKET_URL = 'https://ots-backend.vercel.app'; // Socket.io connects at root, not /api
+const SOCKET_URL = 'https://order-tracking-backend-00rd.onrender.com'; // Socket.io connects at root, not /api
 
 export const socketService = {
   connect: () => {

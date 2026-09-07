@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'https://ots-backend.vercel.app/api'; // Backend base path is /api/*
+const API_URL = 'https://order-tracking-backend-00rd.onrender.com/api'; // Backend base path is /api/*
 
 // Create axios instance
 const api = axios.create({
