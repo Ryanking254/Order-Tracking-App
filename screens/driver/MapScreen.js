@@ -1,168 +1,129 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
-import { Button, Headline, Card, Paragraph, ActivityIndicator } from 'react-native-paper';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, StatusBar, Alert, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { colors, radius, shadow } from '../../theme';
+import { AppButton } from '../../components/ui';
+import LiveMap from '../../components/LiveMap';
 import { trackingAPI } from '../../services/api';
 import socketService from '../../services/socketService';
 
 export default function DriverMapScreen({ route }) {
-  const { deliveryId } = route.params;
-  const [location, setLocation] = useState(null);
-  const [tracking, setTracking] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const deliveryId = route.params?.deliveryId;
+  const [pos, setPos] = useState(null);
+  const [sharing, setSharing] = useState(!!deliveryId);
+  const [perm, setPerm] = useState('loading');
+  const subRef = useRef(null);
+  const lastSent = useRef(0);
+  const mapRef = useRef(null);
 
   useEffect(() => {
-    requestLocationPermission();
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setPerm(status === 'granted' ? 'granted' : 'denied');
+      if (status !== 'granted') return;
+      const cur = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).catch(() => null);
+      if (cur) {
+        setPos({ latitude: cur.coords.latitude, longitude: cur.coords.longitude });
+        mapRef.current?.animateToRegion(
+          { latitude: cur.coords.latitude, longitude: cur.coords.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+          500
+        );
+      }
+    })();
     socketService.connect();
+    return () => subRef.current?.remove();
   }, []);
 
-  const requestLocationPermission = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Error', 'Location permission is required');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to request location permission');
+  // Continuous foreground GPS while sharing is on
+  useEffect(() => {
+    if (perm !== 'granted' || !sharing) {
+      subRef.current?.remove();
+      subRef.current = null;
+      return;
     }
-  };
+    let alive = true;
+    (async () => {
+      subRef.current = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
+        async (loc) => {
+          if (!alive) return;
+          const c = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+          setPos(c);
+          const now = Date.now();
+          if (deliveryId && now - lastSent.current > 8000) {
+            lastSent.current = now;
+            try {
+              await trackingAPI.updateLocation(deliveryId, c.latitude, c.longitude, loc.coords.accuracy);
+            } catch {}
+            socketService.sendLocationUpdate(deliveryId, c.latitude, c.longitude, loc.coords.accuracy);
+          }
+        }
+      );
+    })();
+    return () => {
+      alive = false;
+      subRef.current?.remove();
+      subRef.current = null;
+    };
+  }, [perm, sharing, deliveryId]);
 
-  const startTracking = async () => {
-    setTracking(true);
-    
+  const sendOnce = async () => {
     try {
-      // Get current location
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      setLocation(currentLocation);
-
-      // Send to backend
-      await trackingAPI.updateLocation(
-        deliveryId,
-        currentLocation.coords.latitude,
-        currentLocation.coords.longitude,
-        currentLocation.coords.accuracy
-      );
-
-      // Broadcast via Socket.io
-      socketService.sendLocationUpdate(
-        deliveryId,
-        currentLocation.coords.latitude,
-        currentLocation.coords.longitude,
-        currentLocation.coords.accuracy
-      );
-
-      Alert.alert('Success', 'Location sent!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send location: ' + error.message);
-    } finally {
-      setTracking(false);
-    }
-  };
-
-  const startContinuousTracking = () => {
-    setLoading(true);
-    const interval = setInterval(async () => {
-      try {
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        setLocation(currentLocation);
-
-        // Send to backend
-        await trackingAPI.updateLocation(
-          deliveryId,
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude,
-          currentLocation.coords.accuracy
-        );
-
-        // Broadcast via Socket.io
-        socketService.sendLocationUpdate(
-          deliveryId,
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude,
-          currentLocation.coords.accuracy
-        );
-      } catch (error) {
-        console.error('Tracking error:', error);
+      const cur = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const c = { latitude: cur.coords.latitude, longitude: cur.coords.longitude };
+      setPos(c);
+      mapRef.current?.animateToRegion({ ...c, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 400);
+      if (deliveryId) {
+        await trackingAPI.updateLocation(deliveryId, c.latitude, c.longitude, cur.coords.accuracy);
+        socketService.sendLocationUpdate(deliveryId, c.latitude, c.longitude, cur.coords.accuracy);
+        Alert.alert('Sent 📍', 'Live location shared with customers');
       }
-    }, 10000); // Update every 10 seconds
-
-    // Store interval ID for cleanup
-    setTracking(true);
+    } catch (e) {
+      Alert.alert('Failed', e.message);
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Headline>Live GPS Tracking</Headline>
-          <Paragraph style={styles.label}>Delivery #{deliveryId}</Paragraph>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.head}>
+        <View>
+          <Text style={styles.title}>Live map</Text>
+          <Text style={styles.sub}>
+            {deliveryId ? `Delivery #${deliveryId}` : 'No delivery selected — showing your GPS'} • {perm === 'granted' ? (pos ? `${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}` : 'fixing…') : 'permission needed'}
+          </Text>
+        </View>
+        <View style={styles.toggle}>
+          <Text style={styles.toggleT}>{sharing ? 'Sharing' : 'Paused'}</Text>
+          <Switch value={sharing} onValueChange={setSharing} trackColor={{ true: colors.primary }} />
+        </View>
+      </View>
 
-          {location && (
-            <View style={styles.locationInfo}>
-              <Paragraph>
-                Latitude: {location.coords.latitude.toFixed(6)}
-              </Paragraph>
-              <Paragraph>
-                Longitude: {location.coords.longitude.toFixed(6)}
-              </Paragraph>
-              <Paragraph>
-                Accuracy: {location.coords.accuracy?.toFixed(2)} m
-              </Paragraph>
-            </View>
-          )}
+      <View style={styles.mapWrap}>
+        <LiveMap mapRef={mapRef} userLocation={pos} driverLocation={pos} markers={[]} />
+      </View>
 
-          {!location && (
-            <ActivityIndicator size="large" style={styles.loader} />
-          )}
-        </Card.Content>
-
-        <Card.Actions>
-          <Button
-            mode="contained"
-            onPress={startTracking}
-            loading={tracking}
-            disabled={tracking}
-          >
-            Send Location
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={startContinuousTracking}
-            disabled={loading}
-          >
-            Start Continuous
-          </Button>
-        </Card.Actions>
-      </Card>
-    </View>
+      <View style={styles.foot}>
+        <AppButton title={deliveryId ? 'Broadcast my location now' : 'Center on me'} onPress={sendOnce} />
+        <Text style={styles.hint}>
+          {deliveryId
+            ? 'Auto-broadcasts every ~8s / 10m while Sharing is on.'
+            : 'Open a delivery to auto-share with customers.'}
+        </Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: '#f5f5f5',
-  },
-  card: {
-    marginBottom: 20,
-  },
-  label: {
-    marginVertical: 10,
-  },
-  locationInfo: {
-    marginTop: 15,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  loader: {
-    marginTop: 20,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, gap: 10 },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink },
+  sub: { fontSize: 12, color: colors.muted, marginTop: 3, maxWidth: 240 },
+  toggle: { alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.border },
+  toggleT: { fontSize: 11, fontWeight: '800', color: colors.ink },
+  mapWrap: { flex: 1, marginHorizontal: 16, borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  foot: { padding: 16, paddingBottom: 110 },
+  hint: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 8 },
 });

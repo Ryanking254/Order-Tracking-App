@@ -1,107 +1,72 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
-import { Card, Headline, Paragraph, Chip } from 'react-native-paper';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { StatusPill } from '../../components/ui';
 import { adminAPI } from '../../services/api';
 
 export default function AdminOrdersScreen() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      const response = await adminAPI.getAllOrders();
-      setOrders(response.data.orders);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch orders');
+      const res = await adminAPI.getAllOrders();
+      setOrders(res.data.orders || []);
+    } catch {
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: '#ff9800',
-      assigned: '#2196f3',
-      picked_up: '#9c27b0',
-      in_transit: '#f44336',
-      delivered: '#4caf50',
-      cancelled: '#999',
-    };
-    return colors[status] || '#999';
-  };
-
-  const renderOrder = ({ item }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Headline style={styles.orderNumber}>Order {item.order_number}</Headline>
-        <Paragraph>Customer: {item.customer_name} ({item.customer_phone})</Paragraph>
-        <Paragraph>Driver: {item.driver_name || 'Not assigned'}</Paragraph>
-        <Paragraph>Quantity: {item.quantity} units</Paragraph>
-        <Paragraph>Address: {item.delivery_address}</Paragraph>
-        <Paragraph>Total: KES {item.total_price}</Paragraph>
-
-        <View style={styles.statusRow}>
-          <Chip
-            icon="truck"
-            style={{ backgroundColor: getStatusColor(item.status) }}
-            textStyle={{ color: '#fff' }}
-          >
-            {item.status.toUpperCase()}
-          </Chip>
-          <Chip
-            icon="wallet"
-            style={{
-              backgroundColor: item.payment_status === 'completed' ? '#4caf50' : '#ff9800',
-              marginLeft: 8,
-            }}
-            textStyle={{ color: '#fff' }}
-          >
-            {item.payment_status.toUpperCase()}
-          </Chip>
-        </View>
-      </Card.Content>
-    </Card>
-  );
+  useFocusEffect(useCallback(() => { load(); }, []));
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>All orders</Text>
       <FlatList
         data={orders}
-        renderItem={renderOrder}
-        keyExtractor={(item) => item.id.toString()}
-        onRefresh={fetchOrders}
-        refreshing={loading}
-        ListEmptyComponent={
-          <Headline style={styles.empty}>No orders yet</Headline>
-        }
+        keyExtractor={(i) => String(i.id)}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.ic}><MaterialCommunityIcons name="package-variant-closed" size={20} color={colors.primary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.t}>Order {item.order_number}</Text>
+                <Text style={styles.s}>{item.customer_name} • {item.quantity} items • KES {item.total_price}</Text>
+                <Text style={styles.a} numberOfLines={1}>{item.delivery_address}</Text>
+              </View>
+            </View>
+            <View style={styles.foot}>
+              <StatusPill status={item.status} />
+              <Text style={styles.d}>{item.driver_name || 'Unassigned'}</Text>
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={!loading ? <Text style={styles.empty}>No orders yet</Text> : null}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  card: {
-    marginBottom: 10,
-  },
-  orderNumber: {
-    marginBottom: 10,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink, padding: 18 },
+  list: { padding: 16, paddingTop: 0, paddingBottom: 120, gap: 12 },
+  card: { backgroundColor: '#fff', borderRadius: radius.lg, padding: 14, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  ic: { width: 44, height: 44, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  t: { fontWeight: '800', color: colors.ink, fontSize: 15 },
+  s: { fontSize: 12, color: colors.ink, fontWeight: '600', marginTop: 2 },
+  a: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  foot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  d: { fontSize: 12, color: colors.muted },
+  empty: { textAlign: 'center', marginTop: 60, color: colors.muted },
 });

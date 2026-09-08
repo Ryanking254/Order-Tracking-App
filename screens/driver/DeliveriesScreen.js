@@ -1,93 +1,83 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
-import { Card, Button, Headline, Paragraph, Chip } from 'react-native-paper';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { AppButton } from '../../components/ui';
 import { deliveryAPI } from '../../services/api';
 
 export default function DriverDeliveriesScreen({ navigation }) {
-  const [deliveries, setDeliveries] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDeliveries();
-  }, []);
-
-  const fetchDeliveries = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const response = await deliveryAPI.getMyDeliveries();
-      setDeliveries(response.data.deliveries);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch deliveries');
+      const res = await deliveryAPI.getMyDeliveries();
+      setItems(res.data.deliveries || []);
+    } catch {
+      setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const startDelivery = async (deliveryId) => {
+  useFocusEffect(useCallback(() => { fetchAll(); }, []));
+
+  const start = async (id) => {
     try {
-      await deliveryAPI.startDelivery(deliveryId);
-      Alert.alert('Success', 'Delivery started!');
-      navigation.navigate('ActiveDelivery', { deliveryId });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start delivery');
-    }
+      await deliveryAPI.startDelivery(id);
+      navigation.navigate('ActiveDelivery', { deliveryId: id });
+    } catch {}
   };
 
-  const renderDelivery = ({ item }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Headline>Delivery #{item.id}</Headline>
-        <Paragraph>Orders: {item.order_count}</Paragraph>
-        <Paragraph>Total Quantity: {item.total_quantity || 0} units</Paragraph>
-        
-        <Chip
-          style={{
-            backgroundColor: item.status === 'pending' ? '#ff9800' : '#4caf50',
-            marginTop: 10,
-          }}
-          textStyle={{ color: '#fff' }}
-        >
-          {item.status.toUpperCase()}
-        </Chip>
-      </Card.Content>
-      <Card.Actions>
-        {item.status === 'pending' && (
-          <Button onPress={() => startDelivery(item.id)}>Start</Button>
-        )}
-        <Button onPress={() => navigation.navigate('Map', { deliveryId: item.id })}>
-          View Orders
-        </Button>
-      </Card.Actions>
-    </Card>
-  );
-
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>Deliveries</Text>
+      <Text style={styles.sub}>Pickup jobs assigned to you</Text>
       <FlatList
-        data={deliveries}
-        renderItem={renderDelivery}
-        keyExtractor={(item) => item.id.toString()}
-        onRefresh={fetchDeliveries}
-        refreshing={loading}
-        ListEmptyComponent={
-          <Headline style={styles.empty}>No deliveries assigned</Headline>
-        }
+        data={items}
+        keyExtractor={(i) => String(i.id)}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} tintColor={colors.primary} />}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.icon}><MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.primary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.t}>Delivery #{item.id}</Text>
+                <Text style={styles.s}>{item.order_count} orders • {item.total_quantity || 0} items</Text>
+              </View>
+              <View style={[styles.pill, { backgroundColor: item.status === 'pending' ? '#FFF4E5' : colors.primarySoft }]}>
+                <Text style={[styles.pillT, { color: item.status === 'pending' ? '#B45309' : colors.primaryDark }]}>{String(item.status).toUpperCase()}</Text>
+              </View>
+            </View>
+            <View style={styles.btns}>
+              {item.status === 'pending' ? <AppButton title="Start" onPress={() => start(item.id)} style={{ flex: 1 }} /> : null}
+              <AppButton title="Open" variant="secondary" onPress={() => navigation.navigate('ActiveDelivery', { deliveryId: item.id })} style={{ flex: 1 }} />
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={!loading ? <Text style={styles.empty}>No deliveries assigned</Text> : null}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  card: {
-    marginBottom: 10,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink, paddingHorizontal: 18, paddingTop: 14 },
+  sub: { fontSize: 13, color: colors.muted, paddingHorizontal: 18, marginBottom: 10 },
+  list: { padding: 16, paddingBottom: 120, gap: 12 },
+  card: { backgroundColor: '#fff', borderRadius: radius.lg, padding: 14, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  icon: { width: 46, height: 46, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  t: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  s: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  pillT: { fontSize: 10, fontWeight: '800' },
+  btns: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  empty: { textAlign: 'center', marginTop: 60, color: colors.muted },
 });

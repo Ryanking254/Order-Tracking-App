@@ -1,107 +1,105 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
-import { Card, Button, Headline, Paragraph, Chip } from 'react-native-paper';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { StatusPill } from '../../components/ui';
 import { orderAPI } from '../../services/api';
 
-export default function CustomerOrdersScreen() {
+export default function CustomerOrdersScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchOrders();
-  }, []);
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await orderAPI.getMyOrders();
-      setOrders(response.data.orders);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch orders');
+      const res = await orderAPI.getMyOrders();
+      setOrders(res.data.orders || []);
+    } catch (e) {
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: '#ff9800',
-      assigned: '#2196f3',
-      picked_up: '#9c27b0',
-      in_transit: '#f44336',
-      delivered: '#4caf50',
-    };
-    return colors[status] || '#999';
-  };
+  useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
-  const renderOrder = ({ item }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Headline style={styles.orderNumber}>Order {item.order_number}</Headline>
-        <Paragraph>Quantity: {item.quantity} units</Paragraph>
-        <Paragraph>Address: {item.delivery_address}</Paragraph>
-        <Paragraph>Total: KES {item.total_price}</Paragraph>
-        
-        <View style={styles.statusRow}>
-          <Chip
-            icon="truck"
-            style={{ backgroundColor: getStatusColor(item.status) }}
-            textStyle={{ color: '#fff' }}
-          >
-            {item.status.toUpperCase()}
-          </Chip>
-          <Chip
-            icon="wallet"
-            style={{ 
-              backgroundColor: item.payment_status === 'completed' ? '#4caf50' : '#ff9800',
-              marginLeft: 8
-            }}
-            textStyle={{ color: '#fff' }}
-          >
-            {item.payment_status.toUpperCase()}
-          </Chip>
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate('Tracking', { prefillId: String(item.id) })}
+    >
+      <View style={styles.row}>
+        <View style={styles.iconBox}>
+          <MaterialCommunityIcons name="package-variant-closed" size={22} color={colors.primary} />
         </View>
-      </Card.Content>
-      <Card.Actions>
-        <Button>View Details</Button>
-      </Card.Actions>
-    </Card>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.num}>Order {item.order_number}</Text>
+          <Text style={styles.sub}>{item.quantity} items • KES {item.total_price}</Text>
+          <Text style={styles.addr} numberOfLines={1}>{item.delivery_address}</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={20} color={colors.faint} />
+      </View>
+      <View style={styles.foot}>
+        <StatusPill status={item.status} />
+        <View style={[styles.pay, { backgroundColor: item.payment_status === 'completed' ? colors.primarySoft : '#FFF4E5' }]}>
+          <Text style={[styles.payText, { color: item.payment_status === 'completed' ? colors.primaryDark : '#B45309' }]}>
+            {String(item.payment_status || '').toUpperCase()}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.head}>
+        <Text style={styles.title}>Orders</Text>
+        <TouchableOpacity style={styles.newBtn} onPress={() => navigation.navigate('Home')}>
+          <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+          <Text style={styles.newText}>New</Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={orders}
-        renderItem={renderOrder}
-        keyExtractor={(item) => item.id.toString()}
-        onRefresh={fetchOrders}
-        refreshing={loading}
+        renderItem={renderItem}
+        keyExtractor={(i) => String(i.id)}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchOrders} tintColor={colors.primary} />}
         ListEmptyComponent={
-          <Headline style={styles.empty}>No orders yet</Headline>
+          !loading ? (
+            <View style={styles.empty}>
+              <MaterialCommunityIcons name="shopping-outline" size={44} color={colors.faint} />
+              <Text style={styles.emptyT}>No orders yet</Text>
+              <Text style={styles.emptyS}>Find a cleaner on Home and schedule your first pickup.</Text>
+            </View>
+          ) : null
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  card: {
-    marginBottom: 10,
-  },
-  orderNumber: {
-    marginBottom: 10,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14 },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink },
+  newBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  newText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  list: { paddingHorizontal: 16, paddingBottom: 110, gap: 12 },
+  card: { backgroundColor: '#fff', borderRadius: radius.lg, padding: 14, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconBox: { width: 46, height: 46, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  num: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  sub: { fontSize: 13, color: colors.ink, fontWeight: '600', marginTop: 2 },
+  addr: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  foot: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  pay: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  payText: { fontSize: 10, fontWeight: '800' },
+  empty: { alignItems: 'center', marginTop: 70, paddingHorizontal: 30 },
+  emptyT: { fontSize: 17, fontWeight: '800', color: colors.ink, marginTop: 12 },
+  emptyS: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 6 },
 });

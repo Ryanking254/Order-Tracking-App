@@ -1,83 +1,68 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, RefreshControl } from 'react-native';
-import { Card, Headline, Paragraph } from 'react-native-paper';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
 import { adminAPI } from '../../services/api';
 
 export default function AdminDashboardScreen() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      const response = await adminAPI.getDashboardStats();
-      setStats(response.data.stats);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch dashboard stats');
+      const res = await adminAPI.getDashboardStats();
+      setStats(res.data.stats);
+    } catch {
+      setStats(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const cards = stats
-    ? [
-        { label: "Today's Orders", value: stats.today_orders, icon: 'package-variant' },
-        { label: 'Pending Orders', value: stats.pending_orders, icon: 'clock-outline' },
-        { label: 'Active Deliveries', value: stats.active_deliveries, icon: 'truck' },
-        { label: 'Completed Today', value: stats.completed_today, icon: 'check-circle' },
-        { label: "Today's Revenue", value: `KES ${stats.today_revenue}`, icon: 'wallet' },
-        { label: 'Avg Order Value', value: `KES ${Number(stats.avg_order_value || 0).toFixed(2)}`, icon: 'chart-line' },
-        { label: 'Total Customers', value: stats.total_customers, icon: 'account-group' },
-      ]
-    : [];
+  useFocusEffect(useCallback(() => { load(); }, []));
+
+  const cards = stats ? [
+    { label: "Today's orders", value: stats.today_orders, icon: 'package-variant-closed', bg: '#E7F6EC', c: colors.primary },
+    { label: 'Pending', value: stats.pending_orders, icon: 'clock-outline', bg: '#FFF4E5', c: '#B45309' },
+    { label: 'Active deliveries', value: stats.active_deliveries, icon: 'truck-fast-outline', bg: '#E8F0FE', c: '#2563EB' },
+    { label: 'Completed today', value: stats.completed_today, icon: 'check-circle-outline', bg: '#E7F6EC', c: colors.primary },
+    { label: "Today's revenue", value: `KES ${stats.today_revenue}`, icon: 'wallet-outline', bg: '#F3E8FF', c: '#7C3AED' },
+    { label: 'Customers', value: stats.total_customers, icon: 'account-group-outline', bg: '#E8F0FE', c: '#2563EB' },
+  ] : [];
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchStats} />}
-    >
-      <Headline style={styles.title}>Owner Dashboard</Headline>
-      {cards.map((card) => (
-        <Card key={card.label} style={styles.card}>
-          <Card.Content style={styles.cardContent}>
-            <Headline style={styles.value}>{card.value}</Headline>
-            <Paragraph>{card.label}</Paragraph>
-          </Card.Content>
-        </Card>
-      ))}
-      {!stats && !loading && (
-        <Paragraph style={styles.empty}>No stats available</Paragraph>
-      )}
-    </ScrollView>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>Dashboard</Text>
+      <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}>
+        <View style={styles.grid}>
+          {cards.map((c) => (
+            <View key={c.label} style={styles.card}>
+              <View style={[styles.ic, { backgroundColor: c.bg }]}>
+                <MaterialCommunityIcons name={c.icon} size={22} color={c.c} />
+              </View>
+              <Text style={styles.v}>{c.value}</Text>
+              <Text style={styles.l}>{c.label}</Text>
+            </View>
+          ))}
+        </View>
+        {!stats && !loading ? <Text style={styles.empty}>No stats available</Text> : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  title: {
-    textAlign: 'center',
-    marginVertical: 15,
-  },
-  card: {
-    marginBottom: 10,
-  },
-  cardContent: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  value: {
-    fontWeight: 'bold',
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink, padding: 18 },
+  body: { padding: 16, paddingBottom: 120 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  card: { width: '48%', backgroundColor: '#fff', borderRadius: radius.lg, padding: 15, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  ic: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  v: { fontSize: 19, fontWeight: '800', color: colors.ink },
+  l: { fontSize: 12, color: colors.muted, marginTop: 3 },
+  empty: { textAlign: 'center', marginTop: 60, color: colors.muted },
 });

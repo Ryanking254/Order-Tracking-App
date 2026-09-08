@@ -1,161 +1,81 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Card, Button, Headline, Paragraph, RadioButton, Checkbox } from 'react-native-paper';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { AppButton } from '../../components/ui';
 import { adminAPI } from '../../services/api';
 
 export default function AssignDeliveryScreen({ navigation }) {
   const [drivers, setDrivers] = useState([]);
-  const [pendingOrders, setPendingOrders] = useState([]);
-  const [selectedDriver, setSelectedDriver] = useState(null);
-  const [selectedOrders, setSelectedOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [pending, setPending] = useState([]);
+  const [driverId, setDriverId] = useState(null);
+  const [picked, setPicked] = useState([]);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    (async () => {
+      try {
+        const [d, o] = await Promise.all([adminAPI.getDrivers(), adminAPI.getAllOrders()]);
+        setDrivers(d.data.drivers || []);
+        setPending((o.data.orders || []).filter((x) => x.status === 'pending'));
+      } catch {
+        Alert.alert('Error', 'Failed to load');
+      }
+    })();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [driversRes, ordersRes] = await Promise.all([
-        adminAPI.getDrivers(),
-        adminAPI.getAllOrders(),
-      ]);
-      setDrivers(driversRes.data.drivers);
-      setPendingOrders(ordersRes.data.orders.filter((o) => o.status === 'pending'));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load drivers or orders');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const toggle = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
-  const toggleOrder = (orderId) => {
-    setSelectedOrders((prev) =>
-      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
-    );
-  };
-
-  const handleAssign = async () => {
-    if (!selectedDriver) {
-      Alert.alert('Error', 'Please select a driver');
+  const assign = async () => {
+    if (!driverId || picked.length === 0) {
+      Alert.alert('Select driver + orders', 'Pick at least one of each');
       return;
     }
-    if (selectedOrders.length === 0) {
-      Alert.alert('Error', 'Please select at least one order');
-      return;
-    }
-
-    setSubmitting(true);
+    setBusy(true);
     try {
-      await adminAPI.createDelivery(selectedDriver, selectedOrders);
-      Alert.alert('Success', 'Delivery assigned', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch (err) {
-      Alert.alert('Failed', err.response?.data?.message || 'Could not assign delivery');
+      await adminAPI.createDelivery(driverId, picked);
+      Alert.alert('Assigned 🎉', 'Delivery created', [{ text: 'Done', onPress: () => navigation.goBack() }]);
+    } catch (e) {
+      Alert.alert('Failed', e.response?.data?.message || 'Could not assign');
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Paragraph style={styles.empty}>Loading...</Paragraph>
-      </View>
-    );
-  }
 
   return (
-    <ScrollView style={styles.container}>
-      <Headline style={styles.title}>Assign Delivery</Headline>
-
-      <Card style={styles.section}>
-        <Card.Content>
-          <Headline style={styles.sectionTitle}>1. Select Driver</Headline>
-          {drivers.length === 0 && <Paragraph>No drivers registered</Paragraph>}
-          <RadioButton.Group
-            onValueChange={(value) => setSelectedDriver(Number(value))}
-            value={selectedDriver?.toString()}
-          >
-            {drivers.map((driver) => (
-              <View key={driver.id} style={styles.option}>
-                <RadioButton value={driver.id.toString()} disabled={submitting} />
-                <Paragraph style={styles.optionLabel}>
-                  {driver.name} ({driver.phone})
-                </Paragraph>
-              </View>
-            ))}
-          </RadioButton.Group>
-        </Card.Content>
-      </Card>
-
-      <Card style={styles.section}>
-        <Card.Content>
-          <Headline style={styles.sectionTitle}>2. Select Orders (pending)</Headline>
-          {pendingOrders.length === 0 && <Paragraph>No pending orders</Paragraph>}
-          {pendingOrders.map((order) => (
-            <View key={order.id} style={styles.option}>
-              <Checkbox
-                status={selectedOrders.includes(order.id) ? 'checked' : 'unchecked'}
-                onPress={() => toggleOrder(order.id)}
-                disabled={submitting}
-              />
-              <Paragraph style={styles.optionLabel}>
-                {order.order_number} — {order.customer_name}, {order.quantity} units
-              </Paragraph>
-            </View>
-          ))}
-        </Card.Content>
-      </Card>
-
-      <Button
-        mode="contained"
-        onPress={handleAssign}
-        loading={submitting}
-        disabled={submitting}
-        style={styles.button}
-      >
-        Assign {selectedOrders.length} Order(s)
-      </Button>
-    </ScrollView>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>Assign delivery</Text>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.h}>1 • Driver</Text>
+        {drivers.map((d) => (
+          <TouchableOpacity key={d.id} style={[styles.opt, driverId === d.id && styles.on]} onPress={() => setDriverId(d.id)}>
+            <MaterialCommunityIcons name={driverId === d.id ? 'radiobox-marked' : 'radiobox-blank'} size={20} color={driverId === d.id ? colors.primary : colors.faint} />
+            <Text style={styles.ot}>{d.name} ({d.phone})</Text>
+          </TouchableOpacity>
+        ))}
+        <Text style={[styles.h, { marginTop: 16 }]}>2 • Pending orders</Text>
+        {pending.map((o) => (
+          <TouchableOpacity key={o.id} style={[styles.opt, picked.includes(o.id) && styles.on]} onPress={() => toggle(o.id)}>
+            <MaterialCommunityIcons name={picked.includes(o.id) ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={picked.includes(o.id) ? colors.primary : colors.faint} />
+            <Text style={styles.ot}>{o.order_number} — {o.customer_name}</Text>
+          </TouchableOpacity>
+        ))}
+        {pending.length === 0 ? <Text style={styles.empty}>No pending orders</Text> : null}
+        <AppButton title={`Assign ${picked.length} order(s)`} onPress={assign} loading={busy} disabled={busy} style={{ marginTop: 16 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  title: {
-    textAlign: 'center',
-    marginVertical: 15,
-  },
-  section: {
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 6,
-  },
-  optionLabel: {
-    marginLeft: 8,
-    flex: 1,
-  },
-  button: {
-    marginVertical: 15,
-    paddingVertical: 6,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  title: { fontSize: 22, fontWeight: '800', color: colors.ink, padding: 18 },
+  body: { padding: 16, paddingBottom: 40 },
+  h: { fontSize: 14, fontWeight: '800', color: colors.ink, marginBottom: 10 },
+  opt: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: radius.lg, padding: 13, marginBottom: 8, borderWidth: 1.5, borderColor: colors.border },
+  on: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  ot: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  empty: { color: colors.muted, marginTop: 8 },
 });

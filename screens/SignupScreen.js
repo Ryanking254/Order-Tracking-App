@@ -1,169 +1,112 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Headline, HelperText, RadioButton } from 'react-native-paper';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, StatusBar } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../context/AuthContext';
+import { colors, radius, shadow } from '../theme';
+import { AppButton } from '../components/ui';
 
 export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [role, setRole] = useState('customer');
   const [loading, setLoading] = useState(false);
-  const { signup, error } = useAuth();
+  const { signup } = useAuth();
 
   const handleSignup = async () => {
     if (!name || !phone || !password) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      Alert.alert('Missing info', 'Please fill name, phone and password');
       return;
     }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+    if (password !== confirm) {
+      Alert.alert('Passwords do not match', 'Please re-enter');
       return;
     }
-
     setLoading(true);
     try {
       await signup(name, phone, password, role, email || null);
-      // Navigation happens automatically based on user role
     } catch (err) {
-      Alert.alert('Signup Failed', err.message);
+      Alert.alert('Signup failed', err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Headline style={styles.title}>Create Account</Headline>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>Create account</Text>
+      <Text style={styles.sub}>Join to order water in a couple of taps.</Text>
 
-        <TextInput
-          label="Full Name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-          disabled={loading}
-        />
-
-        <TextInput
-          label="Phone Number"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          placeholder="e.g., 0700000001"
-          style={styles.input}
-          disabled={loading}
-        />
-
-        <TextInput
-          label="Email (Optional)"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          style={styles.input}
-          disabled={loading}
-        />
-
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-          disabled={loading}
-        />
-
-        <TextInput
-          label="Confirm Password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          style={styles.input}
-          disabled={loading}
-        />
-
-        <View style={styles.roleSection}>
-          <Headline style={styles.roleTitle}>Select Role:</Headline>
-          
-          <RadioButton.Group onValueChange={(value) => setRole(value)} value={role}>
-            <View style={styles.radioOption}>
-              <RadioButton value="customer" disabled={loading} />
-              <Headline style={styles.radioLabel}>Customer</Headline>
+      <View style={styles.card}>
+        {[
+          { label: 'Full name', icon: 'account-outline', v: name, s: setName, ph: 'Jane Doe', kb: 'default', sec: false },
+          { label: 'Phone number', icon: 'phone-outline', v: phone, s: setPhone, ph: '0700000001', kb: 'phone-pad', sec: false },
+          { label: 'Email (optional)', icon: 'email-outline', v: email, s: setEmail, ph: 'you@mail.com', kb: 'email-address', sec: false },
+          { label: 'Password', icon: 'lock-outline', v: password, s: setPassword, ph: '••••••••', kb: 'default', sec: true },
+          { label: 'Confirm password', icon: 'lock-check-outline', v: confirm, s: setConfirm, ph: '••••••••', kb: 'default', sec: true },
+        ].map((f) => (
+          <View key={f.label}>
+            <Text style={styles.label}>{f.label}</Text>
+            <View style={styles.field}>
+              <MaterialCommunityIcons name={f.icon} size={18} color={colors.muted} />
+              <TextInput
+                value={f.v}
+                onChangeText={f.s}
+                placeholder={f.ph}
+                placeholderTextColor={colors.faint}
+                keyboardType={f.kb}
+                secureTextEntry={f.sec}
+                style={styles.input}
+                editable={!loading}
+              />
             </View>
-            <View style={styles.radioOption}>
-              <RadioButton value="driver" disabled={loading} />
-              <Headline style={styles.radioLabel}>Driver</Headline>
-            </View>
-          </RadioButton.Group>
+          </View>
+        ))}
+
+        <Text style={styles.label}>I am a</Text>
+        <View style={styles.roles}>
+          {[
+            { id: 'customer', icon: 'home-variant-outline', t: 'Customer', d: 'Order & track' },
+            { id: 'driver', icon: 'truck-outline', t: 'Driver', d: 'Deliver' },
+          ].map((r) => (
+            <TouchableOpacity
+              key={r.id}
+              onPress={() => setRole(r.id)}
+              style={[styles.role, role === r.id && styles.roleActive]}
+            >
+              <MaterialCommunityIcons name={r.icon} size={22} color={role === r.id ? colors.primary : colors.muted} />
+              <Text style={[styles.roleT, role === r.id && { color: colors.primaryDark }]}>{r.t}</Text>
+              <Text style={styles.roleD}>{r.d}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {error && <HelperText type="error">{error}</HelperText>}
-
-        <Button
-          mode="contained"
-          onPress={handleSignup}
-          loading={loading}
-          style={styles.button}
-          disabled={loading}
-        >
-          Create Account
-        </Button>
-
-        <Button
-          mode="text"
-          onPress={() => navigation.navigate('Login')}
-          disabled={loading}
-        >
-          Already have an account? Login
-        </Button>
+        <AppButton title="Create account" onPress={handleSignup} loading={loading} disabled={loading} style={{ marginTop: 6 }} />
+        <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.switchBtn}>
+          <Text style={styles.switchText}>Have an account? <Text style={{ color: colors.primary, fontWeight: '800' }}>Log in</Text></Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  content: {
-    padding: 20,
-    paddingTop: 30,
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 30,
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  input: {
-    marginBottom: 12,
-    backgroundColor: '#fff',
-  },
-  roleSection: {
-    marginVertical: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-  },
-  roleTitle: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  radioLabel: {
-    fontSize: 16,
-    marginLeft: 10,
-  },
-  button: {
-    marginTop: 20,
-    paddingVertical: 6,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 20, paddingTop: 52, paddingBottom: 40 },
+  title: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  sub: { fontSize: 14, color: colors.muted, marginTop: 4, marginBottom: 16 },
+  card: { backgroundColor: '#fff', borderRadius: radius.xl, padding: 18, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  label: { fontSize: 13, fontWeight: '700', color: colors.ink, marginTop: 12, marginBottom: 7 },
+  field: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.input, borderRadius: radius.md, paddingHorizontal: 13, paddingVertical: 12 },
+  input: { flex: 1, fontSize: 15, color: colors.ink, paddingVertical: 0 },
+  roles: { flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 14 },
+  role: { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.lg, padding: 14, alignItems: 'center', backgroundColor: '#fff' },
+  roleActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  roleT: { fontWeight: '800', color: colors.ink, marginTop: 6 },
+  roleD: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  switchBtn: { marginTop: 14, alignItems: 'center' },
+  switchText: { fontSize: 13, color: colors.muted },
 });

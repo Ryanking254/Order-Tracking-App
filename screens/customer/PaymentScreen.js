@@ -1,132 +1,88 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView } from 'react-native';
-import { Card, Button, Headline, Paragraph, TextInput, Divider, Chip } from 'react-native-paper';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { AppButton } from '../../components/ui';
 import { paymentAPI } from '../../services/api';
 
 export default function PaymentScreen({ route, navigation }) {
-  const { orderId, totalPrice, paymentMethod } = route.params;
-  const [transactionId, setTransactionId] = useState('');
+  const { orderId, totalPrice, paymentMethod } = route.params || {};
+  const [txn, setTxn] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handlePayment = async () => {
+  const pay = async () => {
     setLoading(true);
     try {
-      await paymentAPI.processPayment(orderId, paymentMethod, transactionId || null);
-      Alert.alert('Success', 'Payment processed successfully!');
-      navigation.goBack();
-    } catch (error) {
-      Alert.alert('Error', 'Payment failed: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOnDeliveryPayment = async () => {
-    setLoading(true);
-    try {
-      await paymentAPI.confirmPaymentOnDelivery(orderId);
-      Alert.alert('Success', 'Payment confirmed!');
-      navigation.goBack();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to confirm payment: ' + error.message);
+      await paymentAPI.processPayment(orderId, paymentMethod, txn || null);
+      Alert.alert('Paid 🎉', 'Payment processed', [{ text: 'Done', onPress: () => navigation.goBack() }]);
+    } catch (e) {
+      Alert.alert('Payment failed', e.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Headline>Payment Details</Headline>
-          <Paragraph style={styles.label}>Order #{orderId}</Paragraph>
-          
-          <Divider style={styles.divider} />
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.title}>Payment</Text>
+        <View style={styles.amountCard}>
+          <Text style={styles.aLabel}>Total amount</Text>
+          <Text style={styles.aVal}>KES {totalPrice}</Text>
+          <Text style={styles.aSub}>Order #{orderId} • {paymentMethod === 'on_app' ? 'Pay in app' : 'Pay on delivery'}</Text>
+        </View>
 
-          <View style={styles.priceSection}>
-            <Headline style={styles.priceLabel}>Total Amount</Headline>
-            <Headline style={styles.priceValue}>KES {totalPrice}</Headline>
+        <View style={styles.card}>
+          <View style={styles.payRow}>
+            <View style={styles.bankIcon}><MaterialCommunityIcons name="bank" size={20} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardT}>Spark debit card</Text>
+              <Text style={styles.cardS}>ending with 9087</Text>
+            </View>
+            <Text style={styles.change}>Change  ›</Text>
           </View>
-
-          <Divider style={styles.divider} />
-
-          <Headline style={styles.methodTitle}>Payment Method</Headline>
-          <Chip style={styles.methodChip}>
-            {paymentMethod === 'on_app' ? 'Pay in App' : 'Pay on Delivery'}
-          </Chip>
-
-          {paymentMethod === 'on_app' && (
-            <View style={styles.appPaymentSection}>
-              <Headline style={styles.sectionTitle}>Enter Transaction ID</Headline>
-              <TextInput
-                label="Transaction ID (Optional)"
-                value={transactionId}
-                onChangeText={setTransactionId}
-                placeholder="e.g., TXN123456"
-                disabled={loading}
-                style={styles.input}
-              />
-              
-              <Button
-                mode="contained"
-                onPress={handlePayment}
-                loading={loading}
-                disabled={loading}
-                style={styles.button}
-              >
-                Complete Payment
-              </Button>
-            </View>
+          {paymentMethod === 'on_app' ? (
+            <>
+              <Text style={styles.label}>Transaction ID (optional)</Text>
+              <View style={styles.field}>
+                <TextInput value={txn} onChangeText={setTxn} placeholder="e.g. TXN123456" placeholderTextColor={colors.faint} style={styles.input} editable={!loading} />
+              </View>
+            </>
+          ) : (
+            <Text style={styles.info}>Payment will be collected during delivery.</Text>
           )}
+          <AppButton title={`Pay Now (KES ${totalPrice})`} onPress={pay} loading={loading} disabled={loading} style={{ marginTop: 12 }} />
+        </View>
 
-          {paymentMethod === 'on_delivery' && (
-            <View style={styles.onDeliverySection}>
-              <Paragraph style={styles.infoText}>
-                Payment will be collected during delivery. Click below to confirm payment received.
-              </Paragraph>
-              
-              <Button
-                mode="contained"
-                onPress={handleOnDeliveryPayment}
-                loading={loading}
-                disabled={loading}
-                style={styles.button}
-              >
-                Confirm Payment Received
-              </Button>
-            </View>
-          )}
-        </Card.Content>
-      </Card>
-
-      <Card style={styles.infoCard}>
-        <Card.Content>
-          <Headline style={styles.infoTitle}>Payment Security</Headline>
-          <Paragraph style={styles.infoText}>
-            All payments are secure and encrypted. Your transaction is protected.
-          </Paragraph>
-        </Card.Content>
-      </Card>
-    </ScrollView>
+        <View style={styles.secure}>
+          <MaterialCommunityIcons name="shield-check-outline" size={18} color={colors.primary} />
+          <Text style={styles.secureT}>Secure & encrypted checkout</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 15, backgroundColor: '#f5f5f5' },
-  card: { marginBottom: 15 },
-  label: { marginTop: 10, fontSize: 14, color: '#666' },
-  divider: { marginVertical: 15 },
-  priceSection: { alignItems: 'center', paddingVertical: 20 },
-  priceLabel: { fontSize: 14, color: '#666' },
-  priceValue: { fontSize: 32, fontWeight: 'bold', color: '#4caf50', marginTop: 8 },
-  methodTitle: { fontSize: 16, marginBottom: 10 },
-  methodChip: { marginBottom: 15 },
-  appPaymentSection: { marginTop: 20 },
-  onDeliverySection: { marginTop: 20 },
-  sectionTitle: { fontSize: 16, marginBottom: 12 },
-  input: { marginBottom: 15, backgroundColor: '#fff' },
-  button: { marginTop: 15, paddingVertical: 6 },
-  infoCard: { marginBottom: 30 },
-  infoTitle: { fontSize: 16, marginBottom: 10 },
-  infoText: { fontSize: 13, color: '#666' },
+  root: { flex: 1, backgroundColor: colors.bg },
+  body: { padding: 16, paddingBottom: 40 },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink, marginBottom: 12 },
+  amountCard: { backgroundColor: colors.ink, borderRadius: radius.xl, padding: 20, alignItems: 'center', ...shadow.card },
+  aLabel: { color: '#9CA3AF', fontSize: 13 },
+  aVal: { color: '#fff', fontSize: 34, fontWeight: '800', marginTop: 6 },
+  aSub: { color: '#9CA3AF', fontSize: 12, marginTop: 6 },
+  card: { backgroundColor: '#fff', borderRadius: radius.xl, padding: 16, marginTop: 14, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  payRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  bankIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  cardT: { fontWeight: '800', color: colors.ink, fontSize: 14 },
+  cardS: { color: colors.muted, fontSize: 12 },
+  change: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.ink, marginTop: 14, marginBottom: 7 },
+  field: { backgroundColor: colors.input, borderRadius: radius.md, paddingHorizontal: 13, paddingVertical: 13 },
+  input: { fontSize: 15, color: colors.ink, paddingVertical: 0 },
+  info: { color: colors.muted, fontSize: 13, marginTop: 14 },
+  secure: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 },
+  secureT: { color: colors.muted, fontSize: 12, fontWeight: '600' },
 });

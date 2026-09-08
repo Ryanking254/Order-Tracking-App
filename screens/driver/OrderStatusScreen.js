@@ -1,111 +1,54 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView } from 'react-native';
-import { Card, Button, Headline, Paragraph, RadioButton, Divider } from 'react-native-paper';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { AppButton } from '../../components/ui';
 import { trackingAPI } from '../../services/api';
 import socketService from '../../services/socketService';
 
-export default function OrderStatusScreen({ route }) {
-  const { orderId, deliveryId, initialStatus } = route.params;
+const OPTIONS = ['pending', 'assigned', 'picked_up', 'in_transit', 'delivered'];
+
+export default function OrderStatusScreen({ route, navigation }) {
+  const { orderId, deliveryId, initialStatus } = route.params || {};
   const [status, setStatus] = useState(initialStatus || 'pending');
   const [loading, setLoading] = useState(false);
 
-  const statusOptions = [
-    { label: 'Pending', value: 'pending' },
-    { label: 'Assigned', value: 'assigned' },
-    { label: 'Picked Up', value: 'picked_up' },
-    { label: 'In Transit', value: 'in_transit' },
-    { label: 'Delivered', value: 'delivered' },
-  ];
-
-  const getStatusColor = (stat) => {
-    const colors = {
-      pending: '#ff9800',
-      assigned: '#2196f3',
-      picked_up: '#9c27b0',
-      in_transit: '#f44336',
-      delivered: '#4caf50',
-    };
-    return colors[stat] || '#999';
-  };
-
-  const updateStatus = async () => {
-    if (status === initialStatus) {
-      Alert.alert('Info', 'Status is already ' + status);
-      return;
-    }
-
+  const save = async () => {
     setLoading(true);
     try {
       await trackingAPI.updateOrderStatus(orderId, status);
       socketService.notifyOrderStatusChange(orderId, status, deliveryId);
-      Alert.alert('Success', `Order status updated to ${status.replace('_', ' ')}`);
-      setLoading(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update status: ' + error.message);
+      Alert.alert('Updated', `Status → ${status}`, [{ text: 'Done', onPress: () => navigation.goBack() }]);
+    } catch (e) {
+      Alert.alert('Failed', e.message);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Headline>Update Order Status</Headline>
-          <Paragraph style={styles.orderId}>Order #{orderId}</Paragraph>
-          <Divider style={styles.divider} />
-          <Headline style={styles.sectionTitle}>Select New Status</Headline>
-
-          <RadioButton.Group onValueChange={(value) => setStatus(value)} value={status}>
-            {statusOptions.map((option) => (
-              <View key={option.value} style={styles.radioOption}>
-                <RadioButton value={option.value} disabled={loading} />
-                <View style={styles.radioLabel}>
-                  <Paragraph>{option.label}</Paragraph>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(option.value) }]}>
-                    <Paragraph style={styles.badgeText}>{option.value.toUpperCase()}</Paragraph>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </RadioButton.Group>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.currentStatusSection}>
-            <Headline style={styles.sectionTitle}>Current Status</Headline>
-            <View style={[styles.currentStatusBadge, { backgroundColor: getStatusColor(initialStatus) }]}>
-              <Paragraph style={styles.badgeText}>{(initialStatus || 'pending').toUpperCase()}</Paragraph>
-            </View>
-          </View>
-        </Card.Content>
-
-        <Card.Actions>
-          <Button
-            mode="contained"
-            onPress={updateStatus}
-            loading={loading}
-            disabled={loading || status === initialStatus}
-            style={styles.updateButton}
-          >
-            Update Status
-          </Button>
-        </Card.Actions>
-      </Card>
-    </ScrollView>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>Order #{orderId}</Text>
+      <ScrollView contentContainerStyle={styles.body}>
+        {OPTIONS.map((o) => (
+          <TouchableOpacity key={o} style={[styles.opt, status === o && styles.optActive]} onPress={() => setStatus(o)}>
+            <MaterialCommunityIcons name={status === o ? 'radiobox-marked' : 'radiobox-blank'} size={22} color={status === o ? colors.primary : colors.faint} />
+            <Text style={[styles.optT, status === o && { color: colors.primaryDark }]}>{o.replace('_', ' ')}</Text>
+          </TouchableOpacity>
+        ))}
+        <AppButton title="Update status" onPress={save} loading={loading} disabled={loading || status === initialStatus} style={{ marginTop: 14 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 15, backgroundColor: '#f5f5f5' },
-  card: { marginBottom: 15 },
-  orderId: { marginTop: 10, fontSize: 14, color: '#666' },
-  divider: { marginVertical: 15 },
-  sectionTitle: { fontSize: 16, marginBottom: 12 },
-  radioOption: { flexDirection: 'row', alignItems: 'center', marginVertical: 10 },
-  radioLabel: { marginLeft: 12, flex: 1 },
-  statusBadge: { marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
-  badgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  currentStatusSection: { marginTop: 10 },
-  currentStatusBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, alignSelf: 'flex-start', marginTop: 8 },
-  updateButton: { flex: 1, marginVertical: 10 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  title: { fontSize: 22, fontWeight: '800', color: colors.ink, padding: 18 },
+  body: { padding: 16, paddingBottom: 40 },
+  opt: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.lg, padding: 15, marginBottom: 10, borderWidth: 1.5, borderColor: colors.border },
+  optActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  optT: { fontSize: 15, fontWeight: '700', color: colors.ink, textTransform: 'capitalize' },
 });

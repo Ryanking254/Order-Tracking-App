@@ -1,99 +1,69 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
-import { Card, Button, Headline, Paragraph, Chip } from 'react-native-paper';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { colors, radius, shadow } from '../../theme';
+import { AppButton } from '../../components/ui';
 import { adminAPI } from '../../services/api';
 
 export default function AdminDeliveriesScreen({ navigation }) {
-  const [deliveries, setDeliveries] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDeliveries();
-  }, []);
-
-  const fetchDeliveries = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      const response = await adminAPI.getActiveDeliveries();
-      setDeliveries(response.data.deliveries);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to fetch active deliveries');
+      const res = await adminAPI.getActiveDeliveries();
+      setItems(res.data.deliveries || []);
+    } catch {
+      setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderDelivery = ({ item }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Headline style={styles.deliveryId}>Delivery #{item.id}</Headline>
-        <Paragraph>Driver: {item.driver_name} ({item.driver_phone})</Paragraph>
-        <Paragraph>Orders: {item.order_count}</Paragraph>
-        <Paragraph>Units: {item.total_quantity}</Paragraph>
-        <Paragraph>
-          Last location:{' '}
-          {item.latest_location
-            ? `${item.latest_location.latitude}, ${item.latest_location.longitude}`
-            : 'No GPS data yet'}
-        </Paragraph>
-
-        <View style={styles.statusRow}>
-          <Chip
-            icon="truck"
-            style={{ backgroundColor: '#f44336' }}
-            textStyle={{ color: '#fff' }}
-          >
-            {item.status.toUpperCase()}
-          </Chip>
-        </View>
-      </Card.Content>
-    </Card>
-  );
+  useFocusEffect(useCallback(() => { load(); }, []));
 
   return (
-    <View style={styles.container}>
-      <Button
-        mode="contained"
-        onPress={() => navigation.navigate('AssignDelivery')}
-        style={styles.assignButton}
-      >
-        Assign New Delivery
-      </Button>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
+      <Text style={styles.title}>Deliveries</Text>
+      <View style={{ paddingHorizontal: 16 }}>
+        <AppButton title="+ Assign new delivery" onPress={() => navigation.navigate('AssignDelivery')} />
+      </View>
       <FlatList
-        data={deliveries}
-        renderItem={renderDelivery}
-        keyExtractor={(item) => item.id.toString()}
-        onRefresh={fetchDeliveries}
-        refreshing={loading}
-        ListEmptyComponent={
-          <Headline style={styles.empty}>No active deliveries</Headline>
-        }
+        data={items}
+        keyExtractor={(i) => String(i.id)}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.ic}><MaterialCommunityIcons name="truck-fast-outline" size={20} color={colors.primary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.t}>Delivery #{item.id}</Text>
+                <Text style={styles.s}>{item.driver_name} • {item.order_count} orders</Text>
+                <Text style={styles.a}>{item.latest_location ? `${item.latest_location.latitude}, ${item.latest_location.longitude}` : 'No GPS yet'}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={!loading ? <Text style={styles.empty}>No active deliveries</Text> : null}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  assignButton: {
-    marginBottom: 10,
-  },
-  card: {
-    marginBottom: 10,
-  },
-  deliveryId: {
-    marginBottom: 10,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  title: { fontSize: 24, fontWeight: '800', color: colors.ink, padding: 18 },
+  list: { padding: 16, gap: 12, paddingBottom: 120 },
+  card: { backgroundColor: '#fff', borderRadius: radius.lg, padding: 14, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+  row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  ic: { width: 44, height: 44, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  t: { fontWeight: '800', color: colors.ink, fontSize: 15 },
+  s: { fontSize: 12, color: colors.ink, fontWeight: '600', marginTop: 2 },
+  a: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  empty: { textAlign: 'center', marginTop: 60, color: colors.muted },
 });
