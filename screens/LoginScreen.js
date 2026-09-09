@@ -32,11 +32,11 @@ export default function LoginScreen({ navigation }) {
       <StatusBar barStyle="dark-content" />
       <View style={styles.hero}>
         <View style={styles.logo}>
-          <MaterialCommunityIcons name="water" size={30} color="#fff" />
+          <MaterialCommunityIcons name="storefront-outline" size={30} color="#fff" />
         </View>
         <Text style={styles.eyebrow}>ORDER TRACKING</Text>
         <Text style={styles.title}>Welcome back 👋</Text>
-        <Text style={styles.sub}>Find nearby refill stations, schedule pickup and track live.</Text>
+        <Text style={styles.sub}>Find nearby shops, place orders and track live.</Text>
       </View>
 
       <View style={styles.card}>
@@ -82,6 +82,7 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.demoTitle}>Demo accounts</Text>
         <Text style={styles.demoText}>Customer  0700000001 / password123</Text>
         <Text style={styles.demoText}>Driver  0711111111 / password123</Text>
+        <Text style={styles.demoText}>Shop owner? Create account → Shop owner</Text>
       </View>
     </ScrollView>
   );

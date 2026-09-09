@@ -25,11 +25,19 @@ export default function CustomerOrdersScreen({ navigation }) {
 
   useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
+  const openOrder = (item) => {
+    if (['picked_up', 'in_transit', 'delivered'].includes(item.status)) {
+      navigation.navigate('Tracking', { prefillId: String(item.id) });
+    } else {
+      navigation.navigate('OrderWaiting', { orderId: item.id });
+    }
+  };
+
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.9}
-      onPress={() => navigation.navigate('Tracking', { prefillId: String(item.id) })}
+      onPress={() => openOrder(item)}
     >
       <View style={styles.row}>
         <View style={styles.iconBox}>
@@ -37,6 +45,7 @@ export default function CustomerOrdersScreen({ navigation }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.num}>Order {item.order_number}</Text>
+          {item.shop_name ? <Text style={styles.shop}>{item.shop_name}</Text> : null}
           <Text style={styles.sub}>{item.quantity} items • KES {item.total_price}</Text>
           <Text style={styles.addr} numberOfLines={1}>{item.delivery_address}</Text>
         </View>
@@ -94,6 +103,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconBox: { width: 46, height: 46, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   num: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  shop: { fontSize: 12, fontWeight: '700', color: colors.primaryDark, marginTop: 1 },
   sub: { fontSize: 13, color: colors.ink, fontWeight: '600', marginTop: 2 },
   addr: { fontSize: 12, color: colors.muted, marginTop: 2 },
   foot: { flexDirection: 'row', gap: 8, marginTop: 12 },

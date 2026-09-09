@@ -12,6 +12,7 @@ export default function SignupScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [role, setRole] = useState('customer');
+  const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
 
@@ -20,13 +21,17 @@ export default function SignupScreen({ navigation }) {
       Alert.alert('Missing info', 'Please fill name, phone and password');
       return;
     }
+    if (role === 'driver' && !inviteCode.trim()) {
+      Alert.alert('Invite code required', 'Ask your shop owner for the 6-letter invite code');
+      return;
+    }
     if (password !== confirm) {
       Alert.alert('Passwords do not match', 'Please re-enter');
       return;
     }
     setLoading(true);
     try {
-      await signup(name, phone, password, role, email || null);
+      await signup(name, phone, password, role, email || null, { inviteCode: inviteCode.trim() || null });
     } catch (err) {
       Alert.alert('Signup failed', err.message);
     } finally {
@@ -38,7 +43,7 @@ export default function SignupScreen({ navigation }) {
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <StatusBar barStyle="dark-content" />
       <Text style={styles.title}>Create account</Text>
-      <Text style={styles.sub}>Join to order water in a couple of taps.</Text>
+      <Text style={styles.sub}>Join to order from local shops in a couple of taps.</Text>
 
       <View style={styles.card}>
         {[
@@ -71,6 +76,7 @@ export default function SignupScreen({ navigation }) {
           {[
             { id: 'customer', icon: 'home-variant-outline', t: 'Customer', d: 'Order & track' },
             { id: 'driver', icon: 'truck-outline', t: 'Driver', d: 'Deliver' },
+            { id: 'admin', icon: 'storefront-outline', t: 'Shop owner', d: 'Onboard shop' },
           ].map((r) => (
             <TouchableOpacity
               key={r.id}
@@ -83,6 +89,33 @@ export default function SignupScreen({ navigation }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {role === 'driver' ? (
+          <View>
+            <Text style={styles.label}>Shop invite code</Text>
+            <View style={styles.field}>
+              <MaterialCommunityIcons name="ticket-confirmation-outline" size={18} color={colors.muted} />
+              <TextInput
+                value={inviteCode}
+                onChangeText={(t) => setInviteCode(t.toUpperCase())}
+                placeholder="e.g. MLDRYM"
+                placeholderTextColor={colors.faint}
+                autoCapitalize="characters"
+                style={[styles.input, { fontWeight: '800', letterSpacing: 2 }]}
+                editable={!loading}
+                maxLength={12}
+              />
+            </View>
+            <Text style={styles.hint}>Get this 6-letter code from your shop owner.</Text>
+          </View>
+        ) : null}
+
+        {role === 'admin' ? (
+          <View style={styles.ownerNote}>
+            <MaterialCommunityIcons name="storefront-outline" size={18} color={colors.primaryDark} />
+            <Text style={styles.ownerNoteT}>Next: add your shop name + photo, then invite drivers.</Text>
+          </View>
+        ) : null}
 
         <AppButton title="Create account" onPress={handleSignup} loading={loading} disabled={loading} style={{ marginTop: 6 }} />
         <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.switchBtn}>
@@ -107,6 +140,9 @@ const styles = StyleSheet.create({
   roleActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   roleT: { fontWeight: '800', color: colors.ink, marginTop: 6 },
   roleD: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  hint: { fontSize: 12, color: colors.muted, marginTop: 6 },
+  ownerNote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: 12, marginTop: 4, marginBottom: 8 },
+  ownerNoteT: { fontSize: 13, fontWeight: '600', color: colors.primaryDark, flex: 1 },
   switchBtn: { marginTop: 14, alignItems: 'center' },
   switchText: { fontSize: 13, color: colors.muted },
 });

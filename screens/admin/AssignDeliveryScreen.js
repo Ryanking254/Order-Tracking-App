@@ -52,7 +52,7 @@ export default function AssignDeliveryScreen({ navigation }) {
         {drivers.map((d) => (
           <TouchableOpacity key={d.id} style={[styles.opt, driverId === d.id && styles.on]} onPress={() => setDriverId(d.id)}>
             <MaterialCommunityIcons name={driverId === d.id ? 'radiobox-marked' : 'radiobox-blank'} size={20} color={driverId === d.id ? colors.primary : colors.faint} />
-            <Text style={styles.ot}>{d.name} ({d.phone})</Text>
+            <Text style={styles.ot}>{d.name} ({d.phone}){d.shop_name ? ` • ${d.shop_name}` : ''}</Text>
           </TouchableOpacity>
         ))}
         <Text style={[styles.h, { marginTop: 16 }]}>2 • Pending orders</Text>

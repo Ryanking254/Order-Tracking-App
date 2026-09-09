@@ -13,6 +13,7 @@ export default function FloatingTabBar({ state, descriptors, navigation }) {
       Tracking: focused ? 'map-marker-path' : 'map-marker-path',
       Profile: focused ? 'account' : 'account-outline',
       Deliveries: focused ? 'truck' : 'truck-outline',
+      Queue: focused ? 'inbox' : 'inbox-outline',
       Map: focused ? 'navigation' : 'navigation-outline',
       Dashboard: focused ? 'view-dashboard' : 'view-dashboard-outline',
       AllOrders: focused ? 'package-variant-closed' : 'package-variant',

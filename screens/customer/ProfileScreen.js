@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors, radius, shadow } from '../../theme';
 
 export default function ProfileScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user, shop, logout } = useAuth();
 
   const confirmLogout = () => {
     Alert.alert('Log out?', 'You will need to sign in again.', [
@@ -15,12 +15,23 @@ export default function ProfileScreen({ navigation }) {
     ]);
   };
 
-  const rows = [
+  const customerRows = [
     { icon: 'map-marker-path', t: 'Track order', s: 'Live status & courier', go: () => navigation.navigate('Tracking') },
-    { icon: 'package-variant-closed', t: 'My orders', s: 'History & receipts', go: () => navigation.navigate('Orders') },
-    { icon: 'credit-card-outline', t: 'Payments', s: 'Spark debit •• 9087', go: () => navigation.navigate('Orders') },
+    { icon: 'package-variant-closed', t: 'My orders', s: 'History & receipts', go: () => navigation.navigate('CustomerTabs', { screen: 'Orders' }) },
+    { icon: 'credit-card-outline', t: 'Payments', s: 'Spark debit •• 9087', go: () => navigation.navigate('CustomerTabs', { screen: 'Orders' }) },
     { icon: 'bell-outline', t: 'Notifications', s: 'Pickup reminders on', go: () => {} },
   ];
+  const driverRows = [
+    { icon: 'truck-fast-outline', t: 'New orders', s: 'Claim shop orders', go: () => navigation.navigate('Queue') },
+    { icon: 'package-variant-closed', t: 'My deliveries', s: 'Assigned jobs', go: () => navigation.navigate('Deliveries') },
+    { icon: 'map-marker-path', t: 'Live map', s: 'Share GPS', go: () => navigation.navigate('Map') },
+  ];
+  const adminRows = [
+    { icon: 'view-dashboard-outline', t: 'Dashboard', s: 'Stats & invite code', go: () => navigation.navigate('Dashboard') },
+    { icon: 'package-variant-closed', t: 'All orders', s: 'Shop orders', go: () => navigation.navigate('AllOrders') },
+    { icon: 'truck-fast-outline', t: 'Active deliveries', s: 'Live couriers', go: () => navigation.navigate('ActiveDeliveries') },
+  ];
+  const rows = user?.role === 'driver' ? driverRows : user?.role === 'admin' ? adminRows : customerRows;
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -28,11 +39,18 @@ export default function ProfileScreen({ navigation }) {
       <View style={styles.hero}>
         <View style={styles.avatar}><Text style={{ fontSize: 32 }}>🧑‍🦱</Text></View>
         <Text style={styles.name}>{user?.name || 'Guest'}</Text>
-        <Text style={styles.phone}>{user?.phone || ''} • {user?.role || 'customer'}</Text>
-        <View style={styles.locPill}>
-          <MaterialCommunityIcons name="map-marker" size={13} color={colors.primary} />
-          <Text style={styles.locT}>85 Great Portland Street, London</Text>
-        </View>
+        <Text style={styles.phone}>{user?.phone || ''} • {user?.role === 'admin' ? 'shop owner' : user?.role || 'customer'}</Text>
+        {shop?.name ? (
+          <View style={styles.locPill}>
+            <MaterialCommunityIcons name="storefront-outline" size={13} color={colors.primary} />
+            <Text style={styles.locT}>{shop.name}</Text>
+          </View>
+        ) : (
+          <View style={styles.locPill}>
+            <MaterialCommunityIcons name="map-marker" size={13} color={colors.primary} />
+            <Text style={styles.locT}>85 Great Portland Street, London</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.list}>

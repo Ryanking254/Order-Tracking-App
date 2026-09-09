@@ -5,11 +5,13 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, radius, shadow } from '../../theme';
 import { QtyStepper, AppButton } from '../../components/ui';
 import { orderAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const DATES = ['04 July, 2024', '05 July, 2024', '06 July, 2024'];
 const TIMES = ['08:30 AM', '11:00 AM', '02:00 PM', '05:30 PM'];
 
 export default function SchedulePickupScreen({ navigation, route }) {
+  const { user } = useAuth();
   const shop = route.params?.shop || { name: 'Mary Dry Cleaners & Dyers', address: '661 Stanley Road, London' };
   const homeAddress = route.params?.address || '85 Great Portland Street, London';
 
@@ -33,16 +35,26 @@ export default function SchedulePickupScreen({ navigation, route }) {
       Alert.alert('Empty bag', 'Add at least one item');
       return;
     }
+    const shopId = shop?.id || user?.shop_id;
+    if (!shopId) {
+      Alert.alert('No shop', 'Choose a shop first');
+      return;
+    }
     setPaying(true);
     try {
       const perUnit = total / totalQty;
-      await orderAPI.createOrder(totalQty, `${homeAddress} | ${shop.name} | ${DATES[dateIdx]} ${TIMES[timeIdx]}`, perUnit, 'on_app', items.map((i) => `${i.name}x${i.qty}`).join(', '));
-      Alert.alert('Scheduled 🎉', `Pickup booked with ${shop.name} for ${DATES[dateIdx]} at ${TIMES[timeIdx]}`, [
-        { text: 'View orders', onPress: () => navigation.navigate('CustomerTabs', { screen: 'Orders' }) },
-        { text: 'OK', style: 'cancel' },
-      ]);
+      const res = await orderAPI.createOrder(totalQty, `${homeAddress} | ${shop.name} | ${DATES[dateIdx]} ${TIMES[timeIdx]}`, perUnit, 'on_app', items.map((i) => `${i.name}x${i.qty}`).join(', '), shopId);
+      const orderId = res.data?.order?.id;
+      if (orderId) {
+        navigation.replace('OrderWaiting', { orderId });
+      } else {
+        Alert.alert('Scheduled 🎉', `Pickup booked with ${shop.name} for ${DATES[dateIdx]} at ${TIMES[timeIdx]}`, [
+          { text: 'View orders', onPress: () => navigation.navigate('CustomerTabs', { screen: 'Orders' }) },
+          { text: 'OK', style: 'cancel' },
+        ]);
+      }
     } catch (e) {
-      Alert.alert('Failed to schedule', e.message);
+      Alert.alert('Failed to schedule', e.response?.data?.message || e.message);
     } finally {
       setPaying(false);
     }

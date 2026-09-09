@@ -12,11 +12,15 @@ import SignupScreen from '../screens/SignupScreen';
 import CustomerHomeScreen from '../screens/customer/HomeScreen';
 import CustomerOrdersScreen from '../screens/customer/OrdersScreen';
 import CustomerTrackingScreen from '../screens/customer/TrackingScreen';
+import OrderWaitingScreen from '../screens/customer/OrderWaitingScreen';
 import PaymentScreen from '../screens/customer/PaymentScreen';
 import SchedulePickupScreen from '../screens/customer/SchedulePickupScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
+import ChooseShopScreen from '../screens/shop/ChooseShopScreen';
 
 import DriverDeliveriesScreen from '../screens/driver/DeliveriesScreen';
+import ShopQueueScreen from '../screens/driver/ShopQueueScreen';
+import JoinShopScreen from '../screens/driver/JoinShopScreen';
 import DriverMapScreen from '../screens/driver/MapScreen';
 import DriverActiveDeliveryScreen from '../screens/driver/ActiveDeliveryScreen';
 import OrderStatusScreen from '../screens/driver/OrderStatusScreen';
@@ -25,6 +29,7 @@ import AdminDashboardScreen from '../screens/admin/DashboardScreen';
 import AdminOrdersScreen from '../screens/admin/OrdersScreen';
 import AdminDeliveriesScreen from '../screens/admin/DeliveriesScreen';
 import AssignDeliveryScreen from '../screens/admin/AssignDeliveryScreen';
+import CreateShopScreen from '../screens/admin/CreateShopScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -61,8 +66,17 @@ function CustomerStack() {
     >
       <Stack.Screen name="CustomerTabs" component={CustomerTabs} />
       <Stack.Screen name="SchedulePickup" component={SchedulePickupScreen} />
+      <Stack.Screen name="OrderWaiting" component={OrderWaitingScreen} />
       <Stack.Screen name="Tracking" component={CustomerTrackingScreen} />
       <Stack.Screen name="Payment" component={PaymentScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function CustomerOnboarding() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ChooseShop" component={ChooseShopScreen} />
     </Stack.Navigator>
   );
 }
@@ -70,10 +84,19 @@ function CustomerStack() {
 function DriverTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Queue" component={ShopQueueScreen} />
       <Tab.Screen name="Deliveries" component={DriverDeliveriesScreen} />
       <Tab.Screen name="Map" component={DriverMapScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
+  );
+}
+
+function DriverOnboarding() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="JoinShop" component={JoinShopScreen} />
+    </Stack.Navigator>
   );
 }
 
@@ -102,6 +125,15 @@ function AdminStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="AdminTabs" component={AdminTabs} />
       <Stack.Screen name="AssignDelivery" component={AssignDeliveryScreen} />
+      <Stack.Screen name="CreateShop" component={CreateShopScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function AdminOnboarding() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="CreateShop" component={CreateShopScreen} />
     </Stack.Navigator>
   );
 }
@@ -116,9 +148,18 @@ export default function RootNavigator() {
       </NavigationContainer>
     );
   }
+  const needsShop = !user?.shop_id;
   return (
     <NavigationContainer>
-      {user?.role === 'admin' ? <AdminStack /> : user?.role === 'driver' ? <DriverStack /> : <CustomerStack />}
+      {user?.role === 'admin' ? (
+        needsShop ? <AdminOnboarding /> : <AdminStack />
+      ) : user?.role === 'driver' ? (
+        needsShop ? <DriverOnboarding /> : <DriverStack />
+      ) : needsShop ? (
+        <CustomerOnboarding />
+      ) : (
+        <CustomerStack />
+      )}
     </NavigationContainer>
   );
 }

@@ -1,28 +1,50 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Location from 'expo-location';
 import { colors, radius, shadow } from '../../theme';
 import { SearchBar, FilterPill, AppButton } from '../../components/ui';
 import LiveMap from '../../components/LiveMap';
+import { shopAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const LONDON = { latitude: 51.5202, longitude: -0.1406 };
 
 const VENDOR_DEFS = [
-  { id: 'v1', price: '$9', dLat: 0.008, dLng: -0.012, name: 'Sparkle Wash & Fold', address: '12 Kent Street, London', dist: '0.8 km from you', rating: '4.5 (212)', perKg: '$2 per kg', tags: ['Dry cleaning', 'Laundry', 'Iron'] },
-  { id: 'v2', price: '$10', dLat: 0.002, dLng: -0.004, name: 'Mary Dry Cleaners & Dyers', address: '661 Stanley Road, London', dist: '1.5 km from you', rating: '4.2 (389)', perKg: '$2 per kg', tags: ['Dry cleaning', 'Laundry', 'Dyeing & Darning', 'Roll polish'] },
-  { id: 'v3', price: '$13', dLat: -0.003, dLng: 0.01, name: 'Prentice Express Laundry', address: '44 Prentice Gate, London', dist: '2.1 km from you', rating: '4.6 (158)', perKg: '$3 per kg', tags: ['Express', 'Laundry'] },
-  { id: 'v4', price: '$15', dLat: -0.01, dLng: -0.006, name: 'Kent Premium Cleaners', address: '9 Kent Rise, London', dist: '2.4 km from you', rating: '4.8 (97)', perKg: '$4 per kg', tags: ['Premium', 'Dyeing'] },
-  { id: 'v5', price: '$8', dLat: 0.011, dLng: 0.006, name: 'Haymaker Budget Wash', address: '21 Haymaker Pkwy, London', dist: '0.5 km from you', rating: '4.0 (301)', perKg: '$1 per kg', tags: ['Budget', 'Wash & Fold'] },
+  { id: 'v1', price: '$9', dLat: 0.008, dLng: -0.012, name: 'Fresh Mart Groceries', address: '12 Kent Street, London', dist: '0.8 km from you', rating: '4.5 (212)', perKg: '$2 per item', tags: ['Groceries', 'Fresh', 'Daily'] },
+  { id: 'v2', price: '$10', dLat: 0.002, dLng: -0.004, name: 'Mary General Store', address: '661 Stanley Road, London', dist: '1.5 km from you', rating: '4.2 (389)', perKg: '$2 per item', tags: ['General', 'Household', 'Essentials'] },
+  { id: 'v3', price: '$13', dLat: -0.003, dLng: 0.01, name: 'Prentice Express Foods', address: '44 Prentice Gate, London', dist: '2.1 km from you', rating: '4.6 (158)', perKg: '$3 per item', tags: ['Express', 'Foods'] },
+  { id: 'v4', price: '$15', dLat: -0.01, dLng: -0.006, name: 'Kent Premium Goods', address: '9 Kent Rise, London', dist: '2.4 km from you', rating: '4.8 (97)', perKg: '$4 per item', tags: ['Premium', 'Gifts'] },
+  { id: 'v5', price: '$8', dLat: 0.011, dLng: 0.006, name: 'Haymaker Budget Store', address: '21 Haymaker Pkwy, London', dist: '0.5 km from you', rating: '4.0 (301)', perKg: '$1 per item', tags: ['Budget', 'Everyday'] },
 ];
 
 export default function CustomerHomeScreen({ navigation }) {
+  const { user } = useAuth();
   const [address, setAddress] = useState('85 Great Portland Street, London');
-  const [selectedId, setSelectedId] = useState('v2');
+  const [selectedId, setSelectedId] = useState(null);
   const [userLoc, setUserLoc] = useState(null);
   const [locStatus, setLocStatus] = useState('loading');
+  const [shops, setShops] = useState([]);
   const mapRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await shopAPI.listShops();
+        const list = res.data.shops || [];
+        setShops(list);
+        // Default to the customer's chosen shop
+        if (user?.shop_id && list.some((s) => s.id === user.shop_id)) {
+          setSelectedId(user.shop_id);
+        } else if (list.length > 0) {
+          setSelectedId(list[0].id);
+        }
+      } catch {
+        // offline — fall back to local mock vendors below
+      }
+    })();
+  }, [user?.shop_id]);
 
   useEffect(() => {
     (async () => {
@@ -48,13 +70,32 @@ export default function CustomerHomeScreen({ navigation }) {
   }, []);
 
   const base = userLoc || LONDON;
-  const vendors = VENDOR_DEFS.map((v) => ({
-    ...v,
-    latitude: base.latitude + v.dLat,
-    longitude: base.longitude + v.dLng,
+  // Real onboarded shops first; mock vendors only as an offline fallback
+  const apiVendors = shops.map((s, i) => ({
+    id: s.id,
+    price: '$9',
+    dLat: 0.008 - i * 0.005,
+    dLng: -0.012 + i * 0.007,
+    name: s.name,
+    address: s.address || '',
+    image_url: s.image_url,
+    dist: 'near you',
+    rating: 'New',
+    perKg: '',
+    tags: ['Shop'],
+    latitude: base.latitude + (0.008 - i * 0.005),
+    longitude: base.longitude + (-0.012 + i * 0.007),
   }));
+  const vendors = apiVendors.length > 0
+    ? apiVendors
+    : VENDOR_DEFS.map((v) => ({
+        ...v,
+        latitude: base.latitude + v.dLat,
+        longitude: base.longitude + v.dLng,
+      }));
 
-  const shop = vendors.find((v) => v.id === selectedId) || vendors[1];
+  const shop = vendors.find((v) => v.id === selectedId) || vendors[0];
+  const effectiveId = shop?.id ?? selectedId;
 
   const focusPin = (v) => {
     setSelectedId(v.id);
@@ -129,7 +170,7 @@ export default function CustomerHomeScreen({ navigation }) {
           mapRef={mapRef}
           userLocation={userLoc}
           markers={vendors}
-          selectedId={selectedId}
+          selectedId={effectiveId}
           onSelectPin={focusPin}
         />
         <TouchableOpacity style={styles.locate} onPress={recenter}>
@@ -139,15 +180,41 @@ export default function CustomerHomeScreen({ navigation }) {
 
       <View style={styles.sheet}>
         <ScrollView showsVerticalScrollIndicator={false}>
+          {shops.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shopRow}>
+              {vendors.map((v) => (
+                <TouchableOpacity
+                  key={String(v.id)}
+                  style={[styles.shopChip, v.id === effectiveId && styles.shopChipActive]}
+                  onPress={() => focusPin(v)}
+                >
+                  {v.image_url ? (
+                    <Image source={{ uri: v.image_url }} style={styles.shopChipImg} />
+                  ) : (
+                    <View style={[styles.shopChipImg, styles.shopChipImgEmpty]}>
+                      <MaterialCommunityIcons name="storefront-outline" size={16} color={colors.faint} />
+                    </View>
+                  )}
+                  <Text style={styles.shopChipT} numberOfLines={1}>{v.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : null}
           <View style={styles.photos}>
-            <View style={[styles.photo, { backgroundColor: '#DCE7EF' }]}>
-              <Text style={styles.photoEmoji}>🧺</Text>
-              <Text style={styles.photoLabel}>Wash hall</Text>
-            </View>
-            <View style={[styles.photo, { backgroundColor: '#E8DDD2' }]}>
-              <Text style={styles.photoEmoji}>👔</Text>
-              <Text style={styles.photoLabel}>Folded & fresh</Text>
-            </View>
+            {shop?.image_url ? (
+              <Image source={{ uri: shop.image_url }} style={[styles.photo, { width: '100%' }]} resizeMode="cover" />
+            ) : (
+              <>
+                <View style={[styles.photo, { backgroundColor: '#DCE7EF' }]}>
+                  <Text style={styles.photoEmoji}>🧺</Text>
+                  <Text style={styles.photoLabel}>Wash hall</Text>
+                </View>
+                <View style={[styles.photo, { backgroundColor: '#E8DDD2' }]}>
+                  <Text style={styles.photoEmoji}>👔</Text>
+                  <Text style={styles.photoLabel}>Folded & fresh</Text>
+                </View>
+              </>
+            )}
           </View>
 
           <Text style={styles.shopName}>{shop.name}</Text>
@@ -212,6 +279,12 @@ const styles = StyleSheet.create({
   mapWrap: { flex: 1, marginHorizontal: 12, borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, position: 'relative' },
   locate: { position: 'absolute', right: 12, bottom: 12, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 5, borderWidth: 1, borderColor: colors.border },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, maxHeight: '46%', ...shadow.tab, borderWidth: 1, borderColor: colors.border },
+  shopRow: { gap: 8, paddingRight: 12, marginBottom: 12 },
+  shopChip: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1.5, borderColor: colors.border, borderRadius: 999, paddingLeft: 4, paddingRight: 12, paddingVertical: 4, backgroundColor: '#fff' },
+  shopChipActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  shopChipImg: { width: 30, height: 30, borderRadius: 15 },
+  shopChipImgEmpty: { backgroundColor: colors.input, alignItems: 'center', justifyContent: 'center' },
+  shopChipT: { fontSize: 12, fontWeight: '800', color: colors.ink, maxWidth: 120 },
   photos: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   photo: { flex: 1, height: 108, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   photoEmoji: { fontSize: 34 },

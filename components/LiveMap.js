@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { colors } from '../theme';
-import StylishMap from './StylishMap';
 
-// Unified live map with web fallback.
+// Native-only map. Web uses LiveMap.web.js (StylishMap fallback) so this
+// file — and react-native-maps, which has no web support — is never loaded
+// in the web bundle.
 // markers: [{ id, latitude, longitude, price, ... }]
 export default function LiveMap({
   initialRegion,
@@ -16,18 +17,6 @@ export default function LiveMap({
   style,
   mapRef,
 }) {
-  // Web: react-native-maps web needs JS API key — fall back to stylish mock.
-  if (Platform.OS === 'web') {
-    const pins = markers.map((m, i) => ({
-      id: m.id,
-      price: m.price || `$${i + 8}`,
-      // spread faux positions around for visual parity
-      x: `${15 + ((i * 17) % 60)}%`,
-      y: `${30 + ((i * 13) % 45)}%`,
-    }));
-    return <StylishMap pins={pins} selectedId={selectedId} onSelectPin={onSelectPin} />;
-  }
-
   const region =
     initialRegion ||
     (userLocation
@@ -96,6 +85,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
+    boxShadow: '0px 2px 5px rgba(0,0,0,0.25)',
     elevation: 4,
   },
   pinSel: { backgroundColor: colors.primary },
